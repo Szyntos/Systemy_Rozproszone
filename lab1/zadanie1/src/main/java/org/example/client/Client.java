@@ -1,65 +1,95 @@
 package org.example.client;
 
+import org.example.utils.Utils;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.net.Socket;
+import java.net.*;
 import java.util.Scanner;
 
 public class Client {
 
     int ID;
-    public static void main(String[] args) {
-        new Client().runClient(); // Create an instance and call a non-static method
+    String nick = "Appa";
+
+
+
+    public static void main(String[] args) throws UnknownHostException {
+        new Client().runClient();
     }
 
-    public void runClient() {
+    public void runClient() throws UnknownHostException {
         System.out.println("Enter your messages (type 'quit' to exit): ");
         String hostName = "localhost";
         int portNumber = 12345;
+        byte[] receiveBuffer = new byte[1024];
+        DatagramPacket sendPacket;
+        InetAddress address = InetAddress.getByName(hostName);
+
 
         try (Socket socket = new Socket(hostName, portNumber);
              PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-             Scanner scanner = new Scanner(System.in)) {
-
-            // Thread for reading server's messages
-
-            ServerReader serverReader = new ServerReader(socket, this);
-
-            serverReader.start();
+             Scanner scanner = new Scanner(System.in);
+             DatagramSocket socketUDP = new DatagramSocket()) {
 
 
+            ServerReader serverReaderTCP = new ServerReader(socket, this);
+            ServerReader serverReaderUDP = new ServerReader(socketUDP, this);
 
-            // Send a nickname or initial message if required
-            out.println("Nick=Appa");
+            serverReaderTCP.start();
+            serverReaderUDP.start();
+
+            out.println("Nick="+nick);
+            out.println("UDPport="+socketUDP.getLocalPort());
+
+
+
 
 
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                serverReader.exit();
+                serverReaderTCP.exit();
+                serverReaderUDP.exit();
                 out.println("_____userQuit_____");
 
             }));
 
-            // Send messages to the server in the main thread
 
             String userInput;
             while (true) {
                 userInput = scanner.nextLine();
+                System.out.print(">");
 
                 if ("quit".equalsIgnoreCase(userInput)) {
-                    serverReader.exit();
+                    serverReaderTCP.exit();
                     out.println("_____userQuit_____");
-                    break; // Exit loop to quit
+                    break;
                 }
 
-                out.println(">" + userInput); // Send user input to server
+                if (userInput.startsWith("U ")){
+                    String msg;
+                    if (userInput.equals("U cat")){
+                        msg = (">ID=" + ID + "Nick=" + nick + "Content=>" + "U " + Utils.asciiArtCat);
+                    } else if (userInput.equals("U PC")){
+                        msg = (">ID=" + ID + "Nick=" + nick + "Content=>" + "U " + Utils.asciiArtPC);
+                    }
+                    else{
+                        msg = (">ID=" + ID + "Nick=" + nick + "Content=>" + userInput);
+                    }
+                    sendPacket = new DatagramPacket(msg.getBytes(), msg.getBytes().length, address, portNumber);
+                    socketUDP.send(sendPacket);
+                }else{
+                    out.println(">" + userInput);
+                }
+
+
             }
 
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (IOException e) {
+//            e.printStackTrace();
+            System.out.println("Could not connect to the server");
         }
-        // Socket auto-closed by try-with-resources
     }
 
     public void setID(int ID) {

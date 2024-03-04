@@ -6,55 +6,55 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.net.Socket;
+import java.net.*;
 import java.util.Objects;
 
 public class ToClient extends Thread {
     Socket clientSocket;
+    DatagramSocket socketUDP;
     int clientID;
     String nick = "";
     Server server;
     PrintWriter out;
-    public ToClient(Socket clientSocket, int ID, Server server){
+    DatagramSocket udpSocket = new DatagramSocket();
+    InetAddress address = InetAddress.getByName("localhost");
+    int portNumber;
+    ClientReader TCPReader;
+    int UDPport = 0;
+    public ToClient(Socket clientSocket, DatagramSocket socketUDP, int ID, Server server) throws IOException {
         this.clientID = ID;
         this.clientSocket = clientSocket;
         this.server = server;
+        this.portNumber = clientSocket.getPort();
+        this.socketUDP = socketUDP;
+        this.TCPReader = new ClientReader(clientSocket, this);
+
     }
 
+
     public void run() {
-        try {
-            this.out = new PrintWriter(clientSocket.getOutputStream(), true);
-            BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+        TCPReader.start();
+    }
 
-            // read msg, send response
-            String msg = in.readLine();
-            nick = Utils.extractWithoutPrefix("Nick=", msg);
-            out.println("ID=" + clientID);
-
-            while (true){
-                msg = in.readLine();
-                if (Objects.equals(msg, "_____userQuit_____")){
-                    System.out.println("User '" + nick + "' id = " + clientID + " Quit");
-                    break;
-                }
-                System.out.println("msg = " + Utils.extractWithoutPrefix(">", msg));
-                this.server.sendToAll(msg, clientID, nick);
-            }
-        } catch (IOException e){
-            e.printStackTrace();
-        } finally {
-
-            this.server.deleteClient(this);
-        }
-
+    public void exit(){
+        TCPReader.exit();
+        server.deleteClient(this);
     }
 
     public int getID(){
         return clientID;
     }
 
-    public void sendMsgToClient(String msg){
-        out.println(">" + msg);
+    public void sendMsgToClient(String msg, boolean UDP) throws IOException {
+        if (UDP){
+            DatagramPacket sendPacket = new DatagramPacket((">" + msg).getBytes(), (">" + msg).getBytes().length, address, UDPport);
+            socketUDP.send(sendPacket);
+            System.out.println("sentudp" + UDPport);
+        } else {
+            TCPReader.out.println(">" + msg);
+        }
+
+
     }
 
 }

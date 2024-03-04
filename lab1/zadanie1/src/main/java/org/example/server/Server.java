@@ -12,7 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
-
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 public class Server {
     static List<ToClient> clientComms = new ArrayList<>();
 
@@ -25,21 +26,26 @@ public class Server {
 
         int portNumber = 12345;
         ServerSocket serverSocket = null;
+        DatagramSocket udpSocket = null;
+
 
         try {
             serverSocket = new ServerSocket(portNumber);
-            System.out.println("TCP Server Started, Listening for Clients");
+            udpSocket = new DatagramSocket(portNumber);
+            ClientReader UDPReader = new ClientReader(udpSocket, this);
+            UDPReader.start();
+
+            System.out.println("Server Started, Listening for Clients");
 
             while(true){
 
 
                 Socket clientSocket = serverSocket.accept();
                 int newClientID = getFreeID();
-                ToClient newClient = new ToClient(clientSocket, newClientID, this);
+                ToClient newClient = new ToClient(clientSocket, udpSocket, newClientID, this);
                 clientComms.add(newClient);
                 newClient.start();
                 System.out.println("New Client connected, ID: " +  newClientID);
-
 
 
             }
@@ -56,12 +62,10 @@ public class Server {
     public static int getFreeID() {
         Set<Integer> usedIDs = new TreeSet<>();
 
-        // Collect all IDs currently in use
         for (ToClient client : clientComms) {
             usedIDs.add(client.getID());
         }
 
-        // Start from 1 and find the first free ID
         int currentID = 1;
         while (usedIDs.contains(currentID)) {
             currentID++;
@@ -72,15 +76,22 @@ public class Server {
 
     public void deleteClient(ToClient toClient){
         clientComms.remove(toClient);
+
     }
 
-    public void sendToAll(String msg, int fromID, String fromNick){
+    public void sendToAll(String msg, int fromID, String fromNick, boolean UDP, int port) throws IOException {
         for (ToClient toClient :
                 clientComms) {
-            if (toClient.clientID == fromID){
+            if ((!UDP && toClient.clientID == fromID) || (UDP && toClient.UDPport == port)){
                 continue;
             }
-            toClient.sendMsgToClient(fromNick + " (" + fromID + ") : " + Utils.extractWithoutPrefix(">", msg));
+            if (!UDP){
+                toClient.sendMsgToClient(fromNick + " (" + fromID + ") : " + Utils.extractWithoutPrefix(">", msg), UDP);
+            } else {
+                toClient.sendMsgToClient(fromNick + " (" + fromID + ") : " + msg, UDP);
+
+            }
+
         }
     }
 }
