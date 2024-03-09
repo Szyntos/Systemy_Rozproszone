@@ -23,7 +23,9 @@ public class Client {
     public void runClient() throws UnknownHostException {
         System.out.println("Enter your messages (type 'quit' to exit): ");
         String hostName = "localhost";
+        InetAddress group = InetAddress.getByName("228.5.6.7");
         int portNumber = 12345;
+        int portNumberMulti = 12346;
         byte[] receiveBuffer = new byte[1024];
         DatagramPacket sendPacket;
         InetAddress address = InetAddress.getByName(hostName);
@@ -32,14 +34,20 @@ public class Client {
         try (Socket socket = new Socket(hostName, portNumber);
              PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
              Scanner scanner = new Scanner(System.in);
-             DatagramSocket socketUDP = new DatagramSocket()) {
+             DatagramSocket socketUDP = new DatagramSocket();
+             MulticastSocket multicastSocket = new MulticastSocket()) {
+
+
+
 
 
             ServerReader serverReaderTCP = new ServerReader(socket, this);
             ServerReader serverReaderUDP = new ServerReader(socketUDP, this);
-
+            MulticastReader multicastReader = new MulticastReader();
+            multicastReader.start();
             serverReaderTCP.start();
             serverReaderUDP.start();
+
 
             out.println("Nick="+nick);
             out.println("UDPport="+socketUDP.getLocalPort());
@@ -51,6 +59,7 @@ public class Client {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 serverReaderTCP.exit();
                 serverReaderUDP.exit();
+                multicastReader.exit();
                 out.println("_____userQuit_____");
 
             }));
@@ -66,9 +75,9 @@ public class Client {
                     out.println("_____userQuit_____");
                     break;
                 }
-
+                String msg;
                 if (userInput.startsWith("U ")){
-                    String msg;
+
                     if (userInput.equals("U cat")){
                         msg = (">ID=" + ID + "Nick=" + nick + "Content=>" + "U " + Utils.asciiArtCat);
                     } else if (userInput.equals("U PC")){
@@ -79,6 +88,11 @@ public class Client {
                     }
                     sendPacket = new DatagramPacket(msg.getBytes(), msg.getBytes().length, address, portNumber);
                     socketUDP.send(sendPacket);
+                }else if (userInput.startsWith("M ")) {
+                    msg = (">ID=" + ID + "Nick=" + nick + "Content=>" + userInput);
+
+                    DatagramPacket packet = new DatagramPacket(msg.getBytes(), msg.getBytes().length, group, portNumberMulti);
+                    multicastSocket.send(packet);
                 }else{
                     out.println(">" + userInput);
                 }

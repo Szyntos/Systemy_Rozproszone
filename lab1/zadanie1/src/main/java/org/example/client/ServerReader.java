@@ -57,11 +57,12 @@ public class ServerReader extends Thread{
 
                 }
             }else{
-                System.out.println("INIT UDP");
+//                System.out.println("INIT UDP");
                 Arrays.fill(receiveBuffer, (byte)0);
                 DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
 
                 while (!exit) {
+                    Arrays.fill(receiveBuffer, (byte)0);
                     socketUDP.receive(receivePacket);
                     System.out.print("byUDP - ");
                     System.out.println(Utils.extractWithoutPrefix(">", new String(receivePacket.getData()).trim()));
